@@ -1,0 +1,134 @@
+import os
+import subprocess
+import asyncio
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler,
+    ContextTypes, filters
+)
+
+BOT_TOKEN = os.getenv("BOT_TOKEN") or "8327108993:AAE_hCDGuubnkURHMj3fj838YZhekyteoXw"
+
+user_data = {}
+active_streams = {}  # chat_id: subprocess.Popen
+RESTART_DELAY = 10  # ثواني لإعادة تشغيل البث بعد توقفه
+
+# ---- وظائف البث ----
+
+async def start_stream(chat_id: int, stream_key: str, m3u8_url: str, context: ContextTypes.DEFAULT_TYPE):
+    facebook_rtmp = f"rtmps://live-api-s.facebook.com:443/rtmp/{stream_key}"
+    ffmpeg_cmd = [
+        "ffmpeg",
+        "-re", "-i", m3u8_url,
+        "-c:v", "copy",
+        "-c:a", "aac",
+        "-f", "flv",
+        facebook_rtmp
+    ]
+
+    try:
+        proc = subprocess.Popen(ffmpeg_cmd)
+        active_streams[chat_id] = proc
+        await context.bot.send_message(chat_id, "✅ تم بدء البث بنجاح!")
+        # مراقبة البث لإعادة التشغيل عند توقفه
+        asyncio.create_task(monitor_stream(chat_id, stream_key, m3u8_url, context))
+    except Exception as e:
+        await context.bot.send_message(chat_id, f"❌ خطأ أثناء تشغيل ffmpeg:\n{e}")
+
+async def monitor_stream(chat_id: int, stream_key: str, m3u8_url: str, context: ContextTypes.DEFAULT_TYPE):
+    proc = active_streams.get(chat_id)
+    if not proc:
+        return
+    proc.wait()
+    # عند انتهاء العملية (توقف البث)
+    await context.bot.send_message(chat_id, "⚠️ البث توقف! جاري إعادة التشغيل...")
+    await asyncio.sleep(RESTART_DELAY)
+    await start_stream(chat_id, stream_key, m3u8_url, context)
+
+async def stop_stream(chat_id: int, context: ContextTypes.DEFAULT_TYPE):
+    proc = active_streams.get(chat_id)
+    if proc:
+        proc.terminate()
+        await context.bot.send_message(chat_id, "🛑 تم إيقاف البث الخاص بك.")
+        active_streams.pop(chat_id, None)
+    else:
+        await context.bot.send_message(chat_id, "⚠️ لا يوجد بث جاري.")
+
+# ---- أوامر Telegram ----
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    keyboard = [
+        [InlineKeyboardButton("أرسل Stream Key", callback_data="send_stream_key")],
+        [InlineKeyboardButton("أرسل رابط m3u8", callback_data="send_m3u8")],
+        [InlineKeyboardButton("إيقاف البث", callback_data="stop_stream")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("👋 مرحباً! استخدم الأزرار لإدارة البث:", reply_markup=reply_markup)
+
+async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    chat_id = query.message.chat.id
+
+    if query.data == "send_stream_key":
+        await query.message.reply_text("أرسل Stream Key الخاص بك:")
+    elif query.data == "send_m3u8":
+        await query.message.reply_text("أرسل رابط m3u8 للبث:")
+    elif query.data == "stop_stream":
+        await stop_stream(chat_id, context)
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    text = update.message.text.strip()
+
+    if chat_id not in user_data:
+        user_data[chat_id] = {"stream_key": text}
+        await update.message.reply_text("✅ تم حفظ Stream Key.\nالآن أرسل رابط m3u8:")
+        return
+
+    stream_key = user_data[chat_id]["stream_key"]
+    m3u8_url = text
+
+    await update.message.reply_text("🚀 جاري بدء البث على فيسبوك...")
+    await start_stream(chat_id, stream_key, m3u8_url, context)
+
+async def send_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    if chat_id in active_streams:
+        text_to_send = " ".join(context.args)
+        if text_to_send:
+            # يمكن هنا اضافة النصوص للبث حسب دعم FFmpeg
+            await update.message.reply_text(f"📝 أرسل النص للبث: {text_to_send}")
+        else:
+            await update.message.reply_text("❌ يرجى كتابة النص بعد الأمر.")
+    else:
+        await update.message.reply_text("⚠️ لا يوجد بث جاري.")
+
+async def send_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    if chat_id in active_streams:
+        image_url = context.args[0] if context.args else None
+        if image_url:
+            await update.message.reply_text(f"🖼️ أرسل الصورة للبث: {image_url}")
+        else:
+            await update.message.reply_text("❌ يرجى وضع رابط الصورة بعد الأمر.")
+    else:
+        await update.message.reply_text("⚠️ لا يوجد بث جاري.")
+
+# ---- تشغيل البوت ----
+
+def main():
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("text", send_text))
+    app.add_handler(CommandHandler("image", send_image))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(CallbackQueryHandler(button))
+
+    print("✅ Bot started successfully")
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
