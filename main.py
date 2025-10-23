@@ -3,7 +3,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 import os
 
-BOT_TOKEN = 8327108993:AAE_hCDGuubnkURHMj3fj838YZhekyteoXw
+BOT_TOKEN = "8327108993:AAE_hCDGuubnkURHMj3fj838YZhekyteoXw"
 
 user_data = {}
 
