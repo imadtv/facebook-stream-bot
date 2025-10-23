@@ -38,22 +38,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         subprocess.Popen(ffmpeg_cmd)
         await update.message.reply_text("✅ تم بدء البث بنجاح!\nاستخدم /stop لإيقاف البث.")
     except Exception as e:
-        await update.message.reply_text(f"❌ حدث خطأ أثناء تشغيل البث:\n{e}")
+        await update.message.reply_text(f"❌ خطأ أثناء تشغيل ffmpeg:\n{e}")
 
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     subprocess.call(["pkill", "-f", "ffmpeg"])
     await update.message.reply_text("🛑 تم إيقاف جميع عمليات البث.")
 
 def main():
-    if not BOT_TOKEN:
-        print("❌ BOT_TOKEN مفقود، أضفه كمتغير بيئة في Railway.")
-        return
-
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("stop", stop))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    print("✅ Bot started and waiting for messages...")
+    print("✅ Bot started successfully")
     app.run_polling()
 
 if __name__ == "__main__":
