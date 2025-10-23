@@ -2,38 +2,24 @@ name: Auto Stream Bot
 
 on:
   schedule:
-    - cron: "0 */6 * * *"  # كل 6 ساعات
+    - cron: "0 */6 * * *"
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
-
-      - name: Install FFmpeg
-        run: |
-          sudo apt update
-          sudo apt install -y ffmpeg
-
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install python-telegram-bot==20.4
-
-      - name: Run Bot
-        env:
+      - run: sudo apt update && sudo apt install -y ffmpeg
+      - run: pip install --upgrade pip && pip install python-telegram-bot==20.4
+      - env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         run: |
           while true; do
-            python bot.py
+            python main.py
             echo "⚠️ البوت توقف! إعادة التشغيل بعد 10 ثواني..."
             sleep 10
           done
