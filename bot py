@@ -8,7 +8,7 @@ from telegram.ext import (
     ContextTypes, filters
 )
 
-BOT_TOKEN = os.getenv("BOT_TOKEN") or "ضع_توكنك_هنا"
+BOT_TOKEN = os.getenv("BOT_TOKEN") or "8327108993:AAE_hCDGuubnkURHMj3fj838YZhekyteoXw"
 
 # ---------------- بيانات المستخدمين والبثوص ----------------
 user_streams = {}  # chat_id: {stream_id: {"stream_key":..., "m3u8":..., "proc":...}}
