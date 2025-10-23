@@ -19,7 +19,7 @@ jobs:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         run: |
           while true; do
-            python bot.py
+            python main.py
             echo "⚠️ البوت توقف! إعادة التشغيل بعد 10 ثواني..."
             sleep 10
           done
